@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Sympto AI</title>
+
+<style>
+body {
+    margin:0;
+    font-family: 'Segoe UI';
+    display:flex;
+    background:#f5f7fb;
+    animation: fadePage 0.6s ease;
+}
+
+@keyframes fadePage {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Sidebar */
+.sidebar {
+    width:250px;
+    background:white;
+    padding:20px;
+    box-shadow:2px 0 10px rgba(0,0,0,0.05);
+}
+
+.sidebar button {
+    width:100%;
+    margin:5px 0;
+    padding:10px;
+    border:none;
+    border-radius:8px;
+    background:#e3f2fd;
+    cursor:pointer;
+    transition:0.2s;
+}
+
+.sidebar button:hover {
+    transform:scale(1.05);
+}
+
+/* Main */
+.main {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+}
+
+/* Header */
+.header {
+    padding:15px;
+    background:#0d47a1;
+    color:white;
+    display:flex;
+    justify-content:space-between;
+}
+
+/* Chat */
+.chat {
+    flex:1;
+    padding:20px;
+    overflow-y:auto;
+}
+
+.message {
+    margin:10px 0;
+    display:flex;
+    animation: fadeInUp 0.4s ease;
+}
+
+@keyframes fadeInUp {
+    from {opacity:0; transform:translateY(10px);}
+    to {opacity:1; transform:translateY(0);}
+}
+
+.user { justify-content:flex-end; }
+.ai { justify-content:flex-start; }
+
+.bubble {
+    padding:12px;
+    border-radius:15px;
+    max-width:60%;
+}
+
+.user .bubble {
+    background:#0d47a1;
+    color:white;
+}
+
+.ai .bubble {
+    background:#e3f2fd;
+}
+
+/* Input */
+.input {
+    display:flex;
+    padding:10px;
+    background:white;
+}
+
+input {
+    flex:1;
+    padding:10px;
+    transition:0.3s;
+}
+
+input:focus {
+    outline:none;
+    border:1px solid #0d47a1;
+    box-shadow:0 0 8px rgba(13,71,161,0.3);
+}
+
+button.send {
+    background:#0d47a1;
+    color:white;
+    border:none;
+    padding:10px;
+    cursor:pointer;
+}
+
+button.send:hover {
+    transform:scale(1.05);
+}
+
+/* Cards */
+.card {
+    background:white;
+    padding:10px;
+    margin:10px 0;
+    border-radius:10px;
+    transition:0.3s;
+}
+
+.card:hover {
+    transform:translateY(-5px);
+    box-shadow:0 10px 20px rgba(0,0,0,0.1);
+}
+
+/* Typing */
+.typing::after {
+    content:"...";
+    animation:dots 1.2s infinite;
+}
+
+@keyframes dots {
+    0% {content:".";}
+    33% {content:"..";}
+    66% {content:"...";}
+}
+</style>
+</head>
+
+<body>
+
+<div class="sidebar">
+<h3>Quick Symptoms</h3>
+<button onclick="fill('fever')">Fever</button>
+<button onclick="fill('headache')">Headache</button>
+<button onclick="fill('cough')">Cough</button>
+</div>
+
+<div class="main">
+
+<div class="header">
+<h2>🩺 Sympto AI</h2>
+<button onclick="download()">Download</button>
+</div>
+
+<div id="chat" class="chat"></div>
+
+<div class="input">
+<input id="input" placeholder="Describe symptoms...">
+<button class="send" onclick="send()">➤</button>
+</div>
+
+</div>
+
+<script>
+const API = "https://your-render-url.onrender.com";
+
+let lastResponse="", lastSymptoms="";
+
+function fill(t){
+    document.getElementById("input").value=t;
+}
+
+function scrollBottom(){
+    let chat=document.getElementById("chat");
+    chat.scrollTo({top:chat.scrollHeight,behavior:"smooth"});
+}
+
+function addMessage(text,role){
+    let div=document.createElement("div");
+    div.className="message "+role;
+
+    let bubble=document.createElement("div");
+    bubble.className="bubble";
+    bubble.innerHTML=text.replace(/\n/g,"<br>");
+
+    div.appendChild(bubble);
+    document.getElementById("chat").appendChild(div);
+
+    scrollBottom();
+}
+
+function addTyping(){
+    let div=document.createElement("div");
+    div.className="message ai";
+
+    let bubble=document.createElement("div");
+    bubble.className="bubble typing";
+    bubble.innerHTML="";
+
+    div.appendChild(bubble);
+    document.getElementById("chat").appendChild(div);
+
+    scrollBottom();
+    return div;
+}
+
+function typeMessage(text){
+    let div=document.createElement("div");
+    div.className="message ai";
+
+    let bubble=document.createElement("div");
+    bubble.className="bubble";
+
+    div.appendChild(bubble);
+    document.getElementById("chat").appendChild(div);
+
+    let i=0;
+    function typing(){
+        if(i<text.length){
+            bubble.innerHTML += text[i]==="\n"?"<br>":text[i];
+            i++;
+            setTimeout(typing,15);
+        }
+    }
+    typing();
+}
+
+function showDiseases(d){
+    d.forEach(x=>{
+        let card=document.createElement("div");
+        card.className="card";
+        card.innerHTML=`<b>${x.disease}</b> - ${x.confidence*100}%`;
+        document.getElementById("chat").appendChild(card);
+    });
+}
+
+async function send(){
+    let input=document.getElementById("input").value;
+    if(!input) return;
+
+    addMessage(input,"user");
+
+    let typingDiv=addTyping();
+
+    const res=await fetch(API+"/analyze",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({symptoms:input})
+    });
+
+    const data=await res.json();
+
+    lastResponse=data.response;
+    lastSymptoms=input;
+
+    typingDiv.remove();
+    typeMessage(data.response);
+    showDiseases(data.diseases);
+}
+
+async function download(){
+    const res=await fetch(API+"/download",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            symptoms:lastSymptoms,
+            response:lastResponse
+        })
+    });
+
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+
+    let a=document.createElement("a");
+    a.href=url;
+    a.download="report.pdf";
+    a.click();
+}
+</script>
+
+</body>
+</html>
