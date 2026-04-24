@@ -15,10 +15,12 @@ app = Flask(__name__)
 CORS(app)
 
 # -------------------------------
-# 📁 LOAD DATASET
+# 📁 LOAD DATASET (SAFE)
 # -------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 csv_path = os.path.join(BASE_DIR, "DiseaseAndSymptoms.csv")
+
+print("📂 Reading CSV from:", csv_path)
 
 if not os.path.exists(csv_path):
     raise FileNotFoundError("❌ DiseaseAndSymptoms.csv not found")
@@ -28,13 +30,15 @@ if os.path.getsize(csv_path) == 0:
 
 df = pd.read_csv(csv_path)
 
-# Clean dataset
+# ✅ CLEAN DATA (FIXED)
 df.columns = df.columns.str.strip()
+
+df = df.fillna("")  # 🔥 FIX NaN issue
 
 for col in df.columns:
     df[col] = df[col].astype(str).str.replace("_", " ").str.lower()
 
-df["all"] = df.drop(columns=["Disease"]).agg(" ".join, axis=1)
+df["all"] = df.drop(columns=["Disease"]).astype(str).agg(" ".join, axis=1)
 
 print("✅ Dataset loaded successfully")
 
@@ -61,9 +65,9 @@ def match_diseases(user_input):
     ]
 
 # -------------------------------
-# 🤖 LLM (SECURE)
+# 🤖 LLM (GROQ SAFE)
 # -------------------------------
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
     raise ValueError("❌ GROQ_API_KEY not set in environment")
@@ -171,7 +175,7 @@ def download():
         return jsonify({"error": str(e)}), 500
 
 # -------------------------------
-# ▶ RUN (RENDER READY)
+# ▶ RUN (RENDER SAFE)
 # -------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
