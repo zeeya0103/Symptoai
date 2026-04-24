@@ -2,279 +2,303 @@
 <html>
 <head>
 <title>Sympto AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Google Font -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 
 <style>
-body {
+* {
     margin:0;
-    font-family: 'Segoe UI';
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Inter', sans-serif;
+}
+
+body {
     display:flex;
-    background:#f5f7fb;
-    animation: fadePage 0.6s ease;
+    height:100vh;
+    background:#f7f9fc;
 }
 
-@keyframes fadePage {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* Sidebar */
+/* SIDEBAR */
 .sidebar {
-    width:250px;
-    background:white;
-    padding:20px;
-    box-shadow:2px 0 10px rgba(0,0,0,0.05);
+    width:260px;
+    background:#ffffff;
+    padding:25px 20px;
+    border-right:1px solid #eee;
+}
+
+.sidebar h2 {
+    font-size:18px;
+    margin-bottom:25px;
 }
 
 .sidebar button {
     width:100%;
-    margin:5px 0;
-    padding:10px;
+    padding:12px;
+    margin-bottom:10px;
     border:none;
-    border-radius:8px;
-    background:#e3f2fd;
+    border-radius:10px;
+    background:#eef4ff;
+    color:#0d47a1;
+    font-weight:500;
     cursor:pointer;
     transition:0.2s;
 }
 
 .sidebar button:hover {
-    transform:scale(1.05);
+    background:#dce8ff;
 }
 
-/* Main */
+/* MAIN */
 .main {
     flex:1;
     display:flex;
     flex-direction:column;
 }
 
-/* Header */
+/* HEADER */
 .header {
-    padding:15px;
-    background:#0d47a1;
-    color:white;
+    height:70px;
+    background:#ffffff;
+    border-bottom:1px solid #eee;
     display:flex;
+    align-items:center;
     justify-content:space-between;
+    padding:0 25px;
 }
 
-/* Chat */
-.chat {
-    flex:1;
-    padding:20px;
-    overflow-y:auto;
+.header h1 {
+    font-size:20px;
+    font-weight:600;
 }
 
-.message {
-    margin:10px 0;
-    display:flex;
-    animation: fadeInUp 0.4s ease;
-}
-
-@keyframes fadeInUp {
-    from {opacity:0; transform:translateY(10px);}
-    to {opacity:1; transform:translateY(0);}
-}
-
-.user { justify-content:flex-end; }
-.ai { justify-content:flex-start; }
-
-.bubble {
-    padding:12px;
-    border-radius:15px;
-    max-width:60%;
-}
-
-.user .bubble {
-    background:#0d47a1;
-    color:white;
-}
-
-.ai .bubble {
-    background:#e3f2fd;
-}
-
-/* Input */
-.input {
-    display:flex;
-    padding:10px;
-    background:white;
-}
-
-input {
-    flex:1;
-    padding:10px;
-    transition:0.3s;
-}
-
-input:focus {
-    outline:none;
-    border:1px solid #0d47a1;
-    box-shadow:0 0 8px rgba(13,71,161,0.3);
-}
-
-button.send {
+.header button {
     background:#0d47a1;
     color:white;
     border:none;
-    padding:10px;
+    padding:10px 18px;
+    border-radius:8px;
     cursor:pointer;
 }
 
-button.send:hover {
-    transform:scale(1.05);
+/* CHAT AREA */
+.chat {
+    flex:1;
+    padding:30px;
+    overflow-y:auto;
 }
 
-/* Cards */
+/* MESSAGE */
+.message {
+    display:flex;
+    margin-bottom:15px;
+}
+
+.user {
+    justify-content:flex-end;
+}
+
+.ai {
+    justify-content:flex-start;
+}
+
+.bubble {
+    max-width:60%;
+    padding:14px 16px;
+    border-radius:14px;
+    font-size:14px;
+    line-height:1.5;
+}
+
+/* USER MESSAGE */
+.user .bubble {
+    background:#0d47a1;
+    color:white;
+    border-bottom-right-radius:4px;
+}
+
+/* AI MESSAGE */
+.ai .bubble {
+    background:white;
+    border:1px solid #eee;
+    border-bottom-left-radius:4px;
+}
+
+/* DISEASE CARDS */
 .card {
     background:white;
-    padding:10px;
-    margin:10px 0;
+    border:1px solid #eee;
+    padding:15px;
+    border-radius:12px;
+    margin-top:10px;
+    font-size:14px;
+}
+
+.card b {
+    display:block;
+    margin-bottom:5px;
+}
+
+/* INPUT BAR */
+.input {
+    padding:15px;
+    border-top:1px solid #eee;
+    background:white;
+    display:flex;
+    gap:10px;
+}
+
+.input input {
+    flex:1;
+    padding:12px;
     border-radius:10px;
-    transition:0.3s;
+    border:1px solid #ddd;
 }
 
-.card:hover {
-    transform:translateY(-5px);
-    box-shadow:0 10px 20px rgba(0,0,0,0.1);
+.input button {
+    background:#0d47a1;
+    color:white;
+    border:none;
+    padding:12px 18px;
+    border-radius:10px;
+    cursor:pointer;
 }
 
-/* Typing */
-.typing::after {
-    content:"...";
-    animation:dots 1.2s infinite;
+/* LOADER */
+.loader {
+    width:20px;
+    height:20px;
+    border:3px solid #eee;
+    border-top:3px solid #0d47a1;
+    border-radius:50%;
+    animation:spin 1s linear infinite;
 }
 
-@keyframes dots {
-    0% {content:".";}
-    33% {content:"..";}
-    66% {content:"...";}
+@keyframes spin {
+    100% { transform:rotate(360deg); }
 }
 </style>
 </head>
 
 <body>
 
+<!-- SIDEBAR -->
 <div class="sidebar">
-<h3>Quick Symptoms</h3>
-<button onclick="fill('fever')">Fever</button>
-<button onclick="fill('headache')">Headache</button>
-<button onclick="fill('cough')">Cough</button>
+    <h2>Quick Symptoms</h2>
+    <button onclick="fill('fever')">Fever</button>
+    <button onclick="fill('headache')">Headache</button>
+    <button onclick="fill('cough')">Cough</button>
 </div>
 
+<!-- MAIN -->
 <div class="main">
 
-<div class="header">
-<h2>🩺 Sympto AI</h2>
-<button onclick="download()">Download</button>
-</div>
+    <!-- HEADER -->
+    <div class="header">
+        <h1>🩺 Sympto AI</h1>
+        <button onclick="download()">Download Report</button>
+    </div>
 
-<div id="chat" class="chat"></div>
+    <!-- CHAT -->
+    <div id="chat" class="chat"></div>
 
-<div class="input">
-<input id="input" placeholder="Describe symptoms...">
-<button class="send" onclick="send()">➤</button>
-</div>
+    <!-- INPUT -->
+    <div class="input">
+        <input id="input" placeholder="Describe your symptoms..." onkeydown="if(event.key==='Enter') send()">
+        <button onclick="send()">Send</button>
+    </div>
 
 </div>
 
 <script>
 const API = "https://your-render-url.onrender.com";
 
-let lastResponse="", lastSymptoms="";
+let lastResponse = "", lastSymptoms = "";
 
-function fill(t){
-    document.getElementById("input").value=t;
+function fill(text){
+    document.getElementById("input").value = text;
 }
 
-function scrollBottom(){
-    let chat=document.getElementById("chat");
-    chat.scrollTo({top:chat.scrollHeight,behavior:"smooth"});
-}
+function addMessage(text, role){
+    let div = document.createElement("div");
+    div.className = "message " + role;
 
-function addMessage(text,role){
-    let div=document.createElement("div");
-    div.className="message "+role;
-
-    let bubble=document.createElement("div");
-    bubble.className="bubble";
-    bubble.innerHTML=text.replace(/\n/g,"<br>");
+    let bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = text.replace(/\n/g,"<br>");
 
     div.appendChild(bubble);
     document.getElementById("chat").appendChild(div);
 
-    scrollBottom();
+    document.getElementById("chat").scrollTop = 999999;
 }
 
-function addTyping(){
-    let div=document.createElement("div");
-    div.className="message ai";
+function addLoader(){
+    let div = document.createElement("div");
+    div.className = "message ai";
 
-    let bubble=document.createElement("div");
-    bubble.className="bubble typing";
-    bubble.innerHTML="";
+    let bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = `<div class="loader"></div>`;
 
     div.appendChild(bubble);
     document.getElementById("chat").appendChild(div);
 
-    scrollBottom();
     return div;
-}
-
-function typeMessage(text){
-    let div=document.createElement("div");
-    div.className="message ai";
-
-    let bubble=document.createElement("div");
-    bubble.className="bubble";
-
-    div.appendChild(bubble);
-    document.getElementById("chat").appendChild(div);
-
-    let i=0;
-    function typing(){
-        if(i<text.length){
-            bubble.innerHTML += text[i]==="\n"?"<br>":text[i];
-            i++;
-            setTimeout(typing,15);
-        }
-    }
-    typing();
 }
 
 function showDiseases(d){
     d.forEach(x=>{
-        let card=document.createElement("div");
-        card.className="card";
-        card.innerHTML=`<b>${x.disease}</b> - ${x.confidence*100}%`;
+        let card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<b>${x.disease}</b>Confidence: ${x.confidence*100}%`;
         document.getElementById("chat").appendChild(card);
     });
 }
 
 async function send(){
-    let input=document.getElementById("input").value;
+    let input = document.getElementById("input").value.trim();
     if(!input) return;
 
     addMessage(input,"user");
+    document.getElementById("input").value = "";
 
-    let typingDiv=addTyping();
+    let loader = addLoader();
 
-    const res=await fetch(API+"/analyze",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({symptoms:input})
-    });
+    try {
+        const res = await fetch(API + "/analyze", {
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({symptoms:input})
+        });
 
-    const data=await res.json();
+        const data = await res.json();
 
-    lastResponse=data.response;
-    lastSymptoms=input;
+        loader.remove();
 
-    typingDiv.remove();
-    typeMessage(data.response);
-    showDiseases(data.diseases);
+        if(data.error){
+            addMessage("Error: "+data.error,"ai");
+            return;
+        }
+
+        lastResponse = data.response;
+        lastSymptoms = input;
+
+        addMessage(data.response,"ai");
+        showDiseases(data.diseases);
+
+    } catch {
+        loader.remove();
+        addMessage("Server error. Try again.","ai");
+    }
 }
 
 async function download(){
-    const res=await fetch(API+"/download",{
+    if(!lastResponse) return alert("No report yet");
+
+    const res = await fetch(API+"/download",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
@@ -283,12 +307,12 @@ async function download(){
         })
     });
 
-    const blob=await res.blob();
-    const url=URL.createObjectURL(blob);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
 
-    let a=document.createElement("a");
-    a.href=url;
-    a.download="report.pdf";
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = "report.pdf";
     a.click();
 }
 </script>
