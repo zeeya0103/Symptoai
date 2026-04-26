@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import pandas as pd
 import os
+import re
 from datetime import datetime
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
@@ -14,46 +15,76 @@ app = Flask(__name__)
 CORS(app)
 
 # -------------------------------
-# LOAD CSV
+# LOAD DATASETS
 # -------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-csv_path = os.path.join(BASE_DIR, "DiseaseAndSymptoms.csv")
 
-if not os.path.exists(csv_path):
-    raise FileNotFoundError("❌ CSV not found")
+main_path = os.path.join(BASE_DIR, "DiseaseAndSymptoms.csv")
+custom_path = os.path.join(BASE_DIR, "custom_data.csv")
 
-df = pd.read_csv(csv_path)
-df = df.fillna("")   # fix NaN issue
+main_df = pd.read_csv(main_path).fillna("")
+custom_df = pd.read_csv(custom_path).fillna("")
 
+df = pd.concat([main_df, custom_df], ignore_index=True)
 df.columns = df.columns.str.strip()
 
+# normalize text
 for col in df.columns:
     df[col] = df[col].astype(str).str.replace("_", " ").str.lower()
 
+# combine all symptom text
 df["all"] = df.drop(columns=["Disease"]).agg(" ".join, axis=1)
 
-print("✅ Dataset loaded")
+print("✅ Dataset loaded & merged")
 
 # -------------------------------
-# MATCH DISEASE
+# SMART MATCHING
 # -------------------------------
 def match_diseases(user_input):
-    words = set(user_input.lower().split())
-    scores = []
+    words = set(re.findall(r'\b\w+\b', user_input.lower()))
+    results = []
 
+    text = user_input.lower()
+
+    # 🚨 HIGH PRIORITY RULES
+    if "missed" in words and "period" in words and ("vomiting" in words or "nausea" in words):
+        return [{"disease": "Possible Pregnancy", "confidence": 0.95}]
+
+    if "chest" in words and "pain" in words:
+        return [{"disease": "Possible Heart Issue", "confidence": 0.95}]
+
+    if "seizure" in words or "unconscious" in words:
+        return [{"disease": "Possible Neurological Emergency", "confidence": 0.95}]
+
+    # 🔍 dataset matching
     for _, row in df.iterrows():
         symptoms_set = set(row["all"].split())
         score = len(words & symptoms_set)
 
-        if score > 0:
-            scores.append((row["Disease"], score))
+        # weighted improvements
+        if "vomiting" in words and "nausea" in symptoms_set:
+            score += 2
 
-    scores.sort(key=lambda x: x[1], reverse=True)
-    total = sum(score for _, score in scores) or 1
+        if "fever" in words and "chills" in symptoms_set:
+            score += 2
+
+        if "cough" in words and "breathing" in symptoms_set:
+            score += 2
+
+        # pregnancy boost
+        if "missed" in words and "period" in words:
+            if "pregnancy" in row["Disease"]:
+                score += 5
+
+        if score > 0:
+            results.append((row["Disease"], score))
+
+    results.sort(key=lambda x: x[1], reverse=True)
+    total = sum(score for _, score in results) or 1
 
     return [
         {"disease": d, "confidence": round(score / total, 2)}
-        for d, score in scores[:3]
+        for d, score in results[:3]
     ]
 
 # -------------------------------
@@ -62,7 +93,7 @@ def match_diseases(user_input):
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
-    raise ValueError("❌ GROQ_API_KEY not set in Render")
+    raise ValueError("❌ GROQ_API_KEY not set")
 
 llm = ChatGroq(
     model="openai/gpt-oss-120b",
@@ -74,19 +105,25 @@ llm = ChatGroq(
 # AI RESPONSE
 # -------------------------------
 def generate_response(symptoms, diseases):
-    try:
-        disease_names = [d["disease"] for d in diseases] or ["General condition"]
+    disease_names = [d["disease"] for d in diseases] or ["Unknown"]
 
-        template = """
-You are a helpful AI medical assistant.
+    template = """
+You are a medical assistant.
+
+STRICT RULES:
+- Suggest only SAFE and COMMON medicines (paracetamol, ORS, etc.)
+- DO NOT suggest antibiotics or prescription drugs
+- Highlight serious conditions clearly
+- If symptoms indicate pregnancy, mention it clearly
+- Keep response simple and practical
 
 User Symptoms:
 {symptoms}
 
-Possible Conditions:
+Possible Diseases:
 {diseases}
 
-Give response in this format:
+Format:
 
 Condition:
 Medicines:
@@ -97,18 +134,15 @@ Disclaimer:
 This is not a medical diagnosis.
 """
 
-        prompt = PromptTemplate.from_template(template)
-        chain = prompt | llm
+    prompt = PromptTemplate.from_template(template)
+    chain = prompt | llm
 
-        res = chain.invoke({
-            "symptoms": symptoms,
-            "diseases": ", ".join(disease_names)
-        })
+    res = chain.invoke({
+        "symptoms": symptoms,
+        "diseases": ", ".join(disease_names)
+    })
 
-        return res.content
-
-    except Exception as e:
-        return f"⚠️ AI service error: {str(e)}"
+    return res.content
 
 # -------------------------------
 # ROUTES
@@ -121,14 +155,10 @@ def home():
 def analyze():
     try:
         data = request.get_json()
-
-        if not data or "symptoms" not in data:
-            return jsonify({"error": "No symptoms provided"}), 400
-
-        symptoms = data["symptoms"].strip()
+        symptoms = data.get("symptoms", "").strip()
 
         if not symptoms:
-            return jsonify({"error": "Empty symptoms"}), 400
+            return jsonify({"error": "Enter symptoms"}), 400
 
         diseases = match_diseases(symptoms)
         response = generate_response(symptoms, diseases)
@@ -147,27 +177,26 @@ def download():
     try:
         data = request.get_json()
 
-        symptoms = data.get("symptoms", "")
-        response = data.get("response", "")
-
         os.makedirs("static", exist_ok=True)
 
-        file_path = f"static/report_{datetime.now().timestamp()}.pdf"
+        filename = f"static/report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
 
-        doc = SimpleDocTemplate(file_path, pagesize=A4)
+        doc = SimpleDocTemplate(filename, pagesize=A4)
         styles = getSampleStyleSheet()
 
         content = [
-            Paragraph("<b>Sympto AI Report</b>", styles["Title"]),
-            Spacer(1, 15),
-            Paragraph(f"<b>Symptoms:</b> {symptoms}", styles["Normal"]),
+            Paragraph("AI Medical Report", styles["Title"]),
             Spacer(1, 10),
-            Paragraph(response.replace("\n", "<br/>"), styles["Normal"])
+            Paragraph(f"Symptoms: {data['symptoms']}", styles["Normal"]),
+            Spacer(1, 10),
+            Paragraph(data["response"], styles["Normal"]),
+            Spacer(1, 10),
+            Paragraph("⚠ This is not a medical diagnosis. Consult a doctor.", styles["Normal"])
         ]
 
         doc.build(content)
 
-        return send_file(file_path, as_attachment=True)
+        return send_file(filename, as_attachment=True)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -176,5 +205,5 @@ def download():
 # RUN
 # -------------------------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
