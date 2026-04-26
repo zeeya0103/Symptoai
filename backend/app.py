@@ -19,8 +19,11 @@ CORS(app)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 csv_path = os.path.join(BASE_DIR, "DiseaseAndSymptoms.csv")
 
+if not os.path.exists(csv_path):
+    raise FileNotFoundError("❌ CSV not found")
+
 df = pd.read_csv(csv_path)
-df = df.fillna("")  # fix NaN issue
+df = df.fillna("")   # fix NaN issue
 
 df.columns = df.columns.str.strip()
 
@@ -59,7 +62,7 @@ def match_diseases(user_input):
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
-    raise ValueError("❌ GROQ_API_KEY not set")
+    raise ValueError("❌ GROQ_API_KEY not set in Render")
 
 llm = ChatGroq(
     model="llama3-70b-8192",
@@ -71,15 +74,16 @@ llm = ChatGroq(
 # AI RESPONSE
 # -------------------------------
 def generate_response(symptoms, diseases):
-    disease_names = [d["disease"] for d in diseases] or ["Unknown"]
+    try:
+        disease_names = [d["disease"] for d in diseases] or ["General condition"]
 
-    template = """
-You are a medical assistant.
+        template = """
+You are a helpful AI medical assistant.
 
 User Symptoms:
 {symptoms}
 
-Possible Diseases:
+Possible Conditions:
 {diseases}
 
 Give response in this format:
@@ -93,15 +97,18 @@ Disclaimer:
 This is not a medical diagnosis.
 """
 
-    prompt = PromptTemplate.from_template(template)
-    chain = prompt | llm
+        prompt = PromptTemplate.from_template(template)
+        chain = prompt | llm
 
-    res = chain.invoke({
-        "symptoms": symptoms,
-        "diseases": ", ".join(disease_names)
-    })
+        res = chain.invoke({
+            "symptoms": symptoms,
+            "diseases": ", ".join(disease_names)
+        })
 
-    return res.content
+        return res.content
+
+    except Exception as e:
+        return f"⚠️ AI service error: {str(e)}"
 
 # -------------------------------
 # ROUTES
@@ -112,37 +119,58 @@ def home():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    data = request.get_json()
-    symptoms = data.get("symptoms", "")
+    try:
+        data = request.get_json()
 
-    diseases = match_diseases(symptoms)
-    response = generate_response(symptoms, diseases)
+        if not data or "symptoms" not in data:
+            return jsonify({"error": "No symptoms provided"}), 400
 
-    return jsonify({
-        "diseases": diseases,
-        "response": response
-    })
+        symptoms = data["symptoms"].strip()
+
+        if not symptoms:
+            return jsonify({"error": "Empty symptoms"}), 400
+
+        diseases = match_diseases(symptoms)
+        response = generate_response(symptoms, diseases)
+
+        return jsonify({
+            "symptoms": symptoms,
+            "diseases": diseases,
+            "response": response
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/download", methods=["POST"])
 def download():
-    data = request.get_json()
+    try:
+        data = request.get_json()
 
-    os.makedirs("static", exist_ok=True)
+        symptoms = data.get("symptoms", "")
+        response = data.get("response", "")
 
-    file = f"static/report_{datetime.now().timestamp()}.pdf"
+        os.makedirs("static", exist_ok=True)
 
-    doc = SimpleDocTemplate(file, pagesize=A4)
-    styles = getSampleStyleSheet()
+        file_path = f"static/report_{datetime.now().timestamp()}.pdf"
 
-    content = [
-        Paragraph("Sympto AI Report", styles["Title"]),
-        Spacer(1, 10),
-        Paragraph(data["response"], styles["Normal"])
-    ]
+        doc = SimpleDocTemplate(file_path, pagesize=A4)
+        styles = getSampleStyleSheet()
 
-    doc.build(content)
+        content = [
+            Paragraph("<b>Sympto AI Report</b>", styles["Title"]),
+            Spacer(1, 15),
+            Paragraph(f"<b>Symptoms:</b> {symptoms}", styles["Normal"]),
+            Spacer(1, 10),
+            Paragraph(response.replace("\n", "<br/>"), styles["Normal"])
+        ]
 
-    return send_file(file, as_attachment=True)
+        doc.build(content)
+
+        return send_file(file_path, as_attachment=True)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 # -------------------------------
 # RUN
