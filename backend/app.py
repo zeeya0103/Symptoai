@@ -7,7 +7,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 
-# LLM
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 
@@ -15,35 +14,25 @@ app = Flask(__name__)
 CORS(app)
 
 # -------------------------------
-# 📁 LOAD DATASET (SAFE)
+# LOAD CSV
 # -------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 csv_path = os.path.join(BASE_DIR, "DiseaseAndSymptoms.csv")
 
-print("📂 Reading CSV from:", csv_path)
-
-if not os.path.exists(csv_path):
-    raise FileNotFoundError("❌ DiseaseAndSymptoms.csv not found")
-
-if os.path.getsize(csv_path) == 0:
-    raise ValueError("❌ CSV file is empty")
-
 df = pd.read_csv(csv_path)
+df = df.fillna("")  # fix NaN issue
 
-# ✅ CLEAN DATA (FIXED)
 df.columns = df.columns.str.strip()
-
-df = df.fillna("")  # 🔥 FIX NaN issue
 
 for col in df.columns:
     df[col] = df[col].astype(str).str.replace("_", " ").str.lower()
 
-df["all"] = df.drop(columns=["Disease"]).astype(str).agg(" ".join, axis=1)
+df["all"] = df.drop(columns=["Disease"]).agg(" ".join, axis=1)
 
-print("✅ Dataset loaded successfully")
+print("✅ Dataset loaded")
 
 # -------------------------------
-# 🧠 DISEASE MATCHING
+# MATCH DISEASE
 # -------------------------------
 def match_diseases(user_input):
     words = set(user_input.lower().split())
@@ -65,12 +54,12 @@ def match_diseases(user_input):
     ]
 
 # -------------------------------
-# 🤖 LLM (GROQ SAFE)
+# GROQ LLM
 # -------------------------------
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
-    raise ValueError("❌ GROQ_API_KEY not set in environment")
+    raise ValueError("❌ GROQ_API_KEY not set")
 
 llm = ChatGroq(
     model="llama3-70b-8192",
@@ -78,104 +67,85 @@ llm = ChatGroq(
     temperature=0.3
 )
 
+# -------------------------------
+# AI RESPONSE
+# -------------------------------
 def generate_response(symptoms, diseases):
-    disease_names = [d["disease"] for d in diseases] or ["No strong match"]
+    disease_names = [d["disease"] for d in diseases] or ["Unknown"]
 
     template = """
-You are a professional AI medical assistant.
+You are a medical assistant.
 
 User Symptoms:
 {symptoms}
 
-Possible Conditions:
+Possible Diseases:
 {diseases}
 
-STRICT FORMAT:
+Give response in this format:
 
 Condition:
-Severity:
-Advice:
-Warning Signs:
+Medicines:
+Home Care:
+Diet Advice:
+When to See Doctor:
 Disclaimer:
-This is not a medical diagnosis. Consult a doctor.
+This is not a medical diagnosis.
 """
 
     prompt = PromptTemplate.from_template(template)
     chain = prompt | llm
 
-    response = chain.invoke({
+    res = chain.invoke({
         "symptoms": symptoms,
         "diseases": ", ".join(disease_names)
     })
 
-    return response.content
+    return res.content
 
 # -------------------------------
-# 🏠 HOME ROUTE
+# ROUTES
 # -------------------------------
 @app.route("/")
 def home():
-    return "✅ Sympto AI Backend Running"
+    return "✅ Backend Running"
 
-# -------------------------------
-# 🚀 ANALYZE API
-# -------------------------------
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    try:
-        data = request.get_json()
-        symptoms = data.get("symptoms", "").strip()
+    data = request.get_json()
+    symptoms = data.get("symptoms", "")
 
-        if not symptoms:
-            return jsonify({"error": "Please enter symptoms"}), 400
+    diseases = match_diseases(symptoms)
+    response = generate_response(symptoms, diseases)
 
-        diseases = match_diseases(symptoms)
-        response = generate_response(symptoms, diseases)
+    return jsonify({
+        "diseases": diseases,
+        "response": response
+    })
 
-        return jsonify({
-            "symptoms": symptoms,
-            "diseases": diseases,
-            "response": response
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-# -------------------------------
-# 📄 DOWNLOAD PDF
-# -------------------------------
 @app.route("/download", methods=["POST"])
 def download():
-    try:
-        data = request.get_json()
-        symptoms = data["symptoms"]
-        response = data["response"]
+    data = request.get_json()
 
-        os.makedirs("static", exist_ok=True)
+    os.makedirs("static", exist_ok=True)
 
-        filename = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        filepath = os.path.join("static", filename)
+    file = f"static/report_{datetime.now().timestamp()}.pdf"
 
-        doc = SimpleDocTemplate(filepath, pagesize=A4)
-        styles = getSampleStyleSheet()
+    doc = SimpleDocTemplate(file, pagesize=A4)
+    styles = getSampleStyleSheet()
 
-        content = [
-            Paragraph("<b>AI Medical Report</b>", styles["Title"]),
-            Spacer(1, 15),
-            Paragraph(f"<b>Symptoms:</b> {symptoms}", styles["Normal"]),
-            Spacer(1, 10),
-            Paragraph(response, styles["Normal"])
-        ]
+    content = [
+        Paragraph("Sympto AI Report", styles["Title"]),
+        Spacer(1, 10),
+        Paragraph(data["response"], styles["Normal"])
+    ]
 
-        doc.build(content)
+    doc.build(content)
 
-        return send_file(filepath, as_attachment=True)
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return send_file(file, as_attachment=True)
 
 # -------------------------------
-# ▶ RUN (RENDER SAFE)
+# RUN
 # -------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
