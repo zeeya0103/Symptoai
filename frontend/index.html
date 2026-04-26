@@ -5,88 +5,225 @@
 
 <style>
 body {
-    font-family: Arial;
-    background: #0f172a;
-    color: white;
-    text-align: center;
+    margin:0;
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    color:white;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+}
+
+/* Container */
+.container {
+    width:90%;
+    max-width:900px;
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(15px);
+    border-radius:20px;
+    padding:20px;
+    box-shadow:0 0 40px rgba(0,0,0,0.3);
+    animation: fadeIn 1s ease;
+}
+
+/* Header */
+.header {
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.header img {
+    width:40px;
+}
+
+.header h2 {
+    margin:0;
+}
+
+/* Hero */
+.hero {
+    text-align:center;
+    margin:20px 0;
+}
+
+.hero img {
+    width:120px;
+    animation: float 3s infinite ease-in-out;
+}
+
+@keyframes float {
+    0%,100% { transform:translateY(0); }
+    50% { transform:translateY(-10px); }
+}
+
+/* Input */
+.input-box {
+    display:flex;
+    gap:10px;
+    margin-top:10px;
 }
 
 input {
-    padding: 10px;
-    width: 60%;
+    flex:1;
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    outline:none;
 }
 
+/* Buttons */
 button {
-    padding: 10px;
-    margin: 5px;
+    border:none;
+    padding:10px 15px;
+    border-radius:10px;
+    cursor:pointer;
+    transition:0.3s;
 }
 
-#output {
-    margin-top: 20px;
+button:hover {
+    transform:scale(1.1);
+}
+
+.analyze { background:#00c6ff; color:black; }
+.download { background:#00ffb3; color:black; }
+.voice { background:#ff9800; }
+
+/* Chat */
+.chat {
+    margin-top:20px;
+    max-height:300px;
+    overflow:auto;
+}
+
+.message {
+    margin:10px 0;
+}
+
+.user {
+    text-align:right;
+}
+
+.ai {
+    text-align:left;
+}
+
+.bubble {
+    display:inline-block;
+    padding:12px;
+    border-radius:15px;
+    max-width:70%;
+}
+
+.user .bubble {
+    background:#00c6ff;
+    color:black;
+}
+
+.ai .bubble {
+    background:#ffffff20;
+}
+
+/* Cards */
+.card {
+    background:#ffffff15;
+    padding:10px;
+    margin:10px 0;
+    border-radius:10px;
+    animation:fadeUp 0.5s ease;
+}
+
+@keyframes fadeUp {
+    from {opacity:0; transform:translateY(10px);}
+    to {opacity:1; transform:translateY(0);}
+}
+
+@keyframes fadeIn {
+    from {opacity:0;}
+    to {opacity:1;}
 }
 </style>
 </head>
 
 <body>
 
-<h2>🩺 Sympto AI</h2>
+<div class="container">
 
-<input id="input" placeholder="Type or speak symptoms">
-<br>
+<div class="header">
+    <img src="https://cdn-icons-png.flaticon.com/512/2966/2966484.png">
+    <h2>Sympto AI</h2>
+</div>
 
-<button onclick="startVoice()">🎤 Speak</button>
-<button onclick="send()">Analyze</button>
-<button onclick="download()">Download Report</button>
+<div class="hero">
+    <img src="https://cdn-icons-png.flaticon.com/512/3774/3774299.png">
+    <p>AI-powered symptom checker</p>
+</div>
 
-<div id="output"></div>
+<div class="input-box">
+    <input id="input" placeholder="Enter symptoms (e.g. fever, headache)">
+    <button class="voice" onclick="startVoice()">🎤</button>
+    <button class="analyze" onclick="send()">Analyze</button>
+    <button class="download" onclick="download()">⬇</button>
+</div>
+
+<div id="chat" class="chat"></div>
+
+</div>
 
 <script>
 const API = "https://symptoai-1.onrender.com";
 
-let lastResponse = "";
-let lastSymptoms = "";
+let lastResponse="", lastSymptoms="";
 
-// 🎤 VOICE INPUT
-function startVoice(){
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+/* Chat UI */
+function addMessage(text, role){
+    let div=document.createElement("div");
+    div.className="message "+role;
 
-    if(!SpeechRecognition){
-        alert("Voice not supported");
-        return;
-    }
+    let bubble=document.createElement("div");
+    bubble.className="bubble";
+    bubble.innerHTML=text.replace(/\n/g,"<br>");
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-IN";
-
-    recognition.start();
-
-    recognition.onresult = function(event){
-        let text = event.results[0][0].transcript;
-        document.getElementById("input").value = text;
-    };
+    div.appendChild(bubble);
+    document.getElementById("chat").appendChild(div);
 }
 
-// 🔍 ANALYZE
-async function send(){
-    let input = document.getElementById("input").value;
+/* Show diseases */
+function showDiseases(d){
+    d.forEach(x=>{
+        let card=document.createElement("div");
+        card.className="card";
+        card.innerHTML=`<b>${x.disease}</b> - ${x.confidence*100}%`;
+        document.getElementById("chat").appendChild(card);
+    });
+}
 
-    const res = await fetch(API + "/analyze", {
+/* Send */
+async function send(){
+    let input=document.getElementById("input").value;
+    if(!input) return;
+
+    addMessage(input,"user");
+
+    const res=await fetch(API+"/analyze",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({symptoms:input})
     });
 
-    const data = await res.json();
+    const data=await res.json();
 
-    lastResponse = data.response;
-    lastSymptoms = input;
+    lastResponse=data.response;
+    lastSymptoms=input;
 
-    document.getElementById("output").innerText = data.response;
+    addMessage(data.response,"ai");
+    showDiseases(data.diseases);
 }
 
-// 📄 DOWNLOAD
+/* Download */
 async function download(){
-    const res = await fetch(API + "/download", {
+    const res=await fetch(API+"/download",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
@@ -95,15 +232,27 @@ async function download(){
         })
     });
 
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
 
-    let a = document.createElement("a");
-    a.href = url;
-    a.download = "report.pdf";
+    let a=document.createElement("a");
+    a.href=url;
+    a.download="report.pdf";
     a.click();
+}
+
+/* Voice Input */
+function startVoice(){
+    let recognition=new webkitSpeechRecognition();
+    recognition.lang="en-IN";
+    recognition.start();
+
+    recognition.onresult=function(event){
+        document.getElementById("input").value=
+            event.results[0][0].transcript;
+    };
 }
 </script>
 
 </body>
-</html>
+</html>s
