@@ -65,7 +65,7 @@ if not GROQ_API_KEY:
     raise ValueError("❌ GROQ_API_KEY not set in Render")
 
 llm = ChatGroq(
-    model="llama3-8b-8192",
+    model="mixtral-8x7b-32768",
     api_key=GROQ_API_KEY,
     temperature=0.3
 )
